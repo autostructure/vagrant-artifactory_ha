@@ -5,14 +5,15 @@
 # configures the configuration version (we support older styles for
 # backwards compatibility). Please don't change it unless you know what
 # you're doing.
-Vagrant.configure("2") do |config|
+Vagrant.configure('2') do |config|
   # The most common configuration options are documented and commented below.
   # For a complete reference, please see the online documentation at
   # https://docs.vagrantup.com.
 
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://atlas.hashicorp.com/search.
-  config.vm.box = "base"
+  config.vm.box = 'puppetlabs/centos-7.0-64-puppet'
+  config.vm.provision :hosts, sync_hosts: true
 
   # Disable automatic box update checking. If you disable this, then
   # boxes will only be checked for updates when the user runs
@@ -53,6 +54,40 @@ Vagrant.configure("2") do |config|
   #
   # View the documentation for the provider you are using for more
   # information on available options.
+
+  install_puppet_script = <<SCRIPT
+yum -y localinstall http://yum.puppetlabs.com/puppetlabs-release-pc1-el-7.noarch.rpm
+/opt/puppetlabs/bin/puppet module install puppetlabs-firewall
+SCRIPT
+
+  config.vm.provision :shell,
+                      inline: install_puppet_script
+
+  config.vm.define :database do |database|
+    database.vm.network "private_network", ip: '10.20.1.2'
+
+    # Provision the database
+    install_artifactory_mysql = <<SCRIPT
+/opt/puppetlabs/bin/puppet module install puppetlabs-mysql
+/opt/puppetlabs/bin/puppet apply /vagrant/manifests/artifactory_mysql.pp --modulepath=/etc/puppetlabs/code/environments/production/modules
+SCRIPT
+
+    database.vm.provision :shell,
+                          inline: install_artifactory_mysql
+  end
+
+  config.vm.define :artifactory do |artifactory|
+    artifactory.vm.network "private_network", ip: '10.20.1.3'
+
+    # Provision the database
+    install_artifactory_mysql = <<SCRIPT
+/opt/puppetlabs/bin/puppet module install autostructure-artifactory
+/opt/puppetlabs/bin/puppet apply /vagrant/manifests/artifactory_server.pp --modulepath=/etc/puppetlabs/code/environments/production/modules
+SCRIPT
+
+    artifactory.vm.provision :shell,
+                             inline: install_artifactory_mysql
+  end
 
   # Define a Vagrant Push strategy for pushing to Atlas. Other push strategies
   # such as FTP and Heroku are also available. See the documentation at
