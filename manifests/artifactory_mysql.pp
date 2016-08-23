@@ -16,8 +16,6 @@ $my_sql_override_options = {
 }
 
 class { '::mysql::server':
-  root_password           => 'strongpassword',
-  remove_default_accounts => true,
   override_options        => $my_sql_override_options
 }
 

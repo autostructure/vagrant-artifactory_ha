@@ -12,8 +12,9 @@ Vagrant.configure('2') do |config|
 
   # Every Vagrant development environment requires a box. You can search for
   # boxes at https://atlas.hashicorp.com/search.
-  config.vm.box = 'puppetlabs/centos-7.0-64-puppet'
+  config.vm.box = 'puppetlabs/centos-7.2-64-puppet'
   config.vm.provision :hosts, sync_hosts: true
+  config.vm.memory = 1024
 
   # Disable automatic box update checking. If you disable this, then
   # boxes will only be checked for updates when the user runs
@@ -44,13 +45,15 @@ Vagrant.configure('2') do |config|
   # backing providers for Vagrant. These expose provider-specific options.
   # Example for VirtualBox:
   #
-  # config.vm.provider "virtualbox" do |vb|
-  #   # Display the VirtualBox GUI when booting the machine
-  #   vb.gui = true
-  #
-  #   # Customize the amount of memory on the VM:
-  #   vb.memory = "1024"
-  # end
+  config.vm.provider 'virtualbox' do |vb|
+    # Customize the amount of memory on the VM:
+    vb.memory = 1024
+  end
+
+  config.vm.provider 'vmware_fusion' do |v|
+    # Customize the amount of memory on the VM:
+    v.vmx['memsize'] = 1024
+  end
   #
   # View the documentation for the provider you are using for more
   # information on available options.
@@ -80,13 +83,13 @@ SCRIPT
     artifactory.vm.network "private_network", ip: '10.20.1.3'
 
     # Provision the database
-    install_artifactory_mysql = <<SCRIPT
+    install_artifactory = <<SCRIPT
 /opt/puppetlabs/bin/puppet module install autostructure-artifactory
 /opt/puppetlabs/bin/puppet apply /vagrant/manifests/artifactory_server.pp --modulepath=/etc/puppetlabs/code/environments/production/modules
 SCRIPT
 
     artifactory.vm.provision :shell,
-                             inline: install_artifactory_mysql
+                             inline: install_artifactory
   end
 
   # Define a Vagrant Push strategy for pushing to Atlas. Other push strategies
