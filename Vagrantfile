@@ -6,6 +6,18 @@
 # backwards compatibility). Please don't change it unless you know what
 # you're doing.
 Vagrant.configure('2') do |config|
+  # Synched Folder.
+  synched_opts = { nfs: true }
+  nfs_exports = ["rw", "noac", "actimeo=0", "intr", "async", "insecure", "no_subtree_check", "noacl", "lookupcache=none"]
+
+  if RUBY_PLATFORM =~ /darwin/
+    nfs_exports << "maproot=0:0"
+    synched_opts[:bsd__nfs_options] = nfs_exports
+  elsif RUBY_PLATFORM =~ /linux/
+    nfs_exports << "no_root_squash"
+    synched_opts[:linux__nfs_options] = nfs_exports
+  end
+
   # The most common configuration options are documented and commented below.
   # For a complete reference, please see the online documentation at
   # https://docs.vagrantup.com.
@@ -14,7 +26,6 @@ Vagrant.configure('2') do |config|
   # boxes at https://atlas.hashicorp.com/search.
   config.vm.box = 'puppetlabs/centos-7.2-64-puppet'
   config.vm.provision :hosts, sync_hosts: true
-  config.vm.memory = 1024
 
   # Disable automatic box update checking. If you disable this, then
   # boxes will only be checked for updates when the user runs
@@ -79,17 +90,34 @@ SCRIPT
                           inline: install_artifactory_mysql
   end
 
-  config.vm.define :artifactory do |artifactory|
-    artifactory.vm.network "private_network", ip: '10.20.1.3'
+  config.vm.define :artifactory0 do |artifactory0|
+    artifactory0.vm.synced_folder "nfs_area", "/nfs/mount", synched_opts
+
+    artifactory0.vm.network "private_network", ip: '10.20.1.3'
 
     # Provision the database
     install_artifactory = <<SCRIPT
-/opt/puppetlabs/bin/puppet module install autostructure-artifactory
-/opt/puppetlabs/bin/puppet apply /vagrant/manifests/artifactory_server.pp --modulepath=/etc/puppetlabs/code/environments/production/modules
+/opt/puppetlabs/bin/puppet module install autostructure-artifactory_ha
+/opt/puppetlabs/bin/puppet apply /vagrant/manifests/artifactory_server_primary.pp --modulepath=/etc/puppetlabs/code/environments/production/modules
 SCRIPT
 
-    artifactory.vm.provision :shell,
-                             inline: install_artifactory
+    artifactory0.vm.provision :shell,
+                              inline: install_artifactory
+  end
+
+  config.vm.define :artifactory1 do |artifactory1|
+    artifactory1.vm.synced_folder "nfs_area", "/nfs/mount", synched_opts
+
+    artifactory1.vm.network "private_network", ip: '10.20.1.4'
+
+    # Provision the database
+    install_artifactory = <<SCRIPT
+/opt/puppetlabs/bin/puppet module install autostructure-artifactory_ha
+/opt/puppetlabs/bin/puppet apply /vagrant/manifests/artifactory_server_secondary.pp --modulepath=/etc/puppetlabs/code/environments/production/modules
+SCRIPT
+
+    artifactory1.vm.provision :shell,
+                              inline: install_artifactory
   end
 
   # Define a Vagrant Push strategy for pushing to Atlas. Other push strategies
